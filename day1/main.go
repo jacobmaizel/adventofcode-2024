@@ -14,6 +14,7 @@ func main() {
 	fmt.Println("Day 1!")
 
 	file, err := os.Open("input.txt")
+	defer file.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -47,15 +48,32 @@ func main() {
 
 	// fmt.Printf("l1 len: %d, l2 len: %d", len(l1), len(l2))
 
-	total := 0
+	totalDistance := 0
 
 	for i, list1Val := range l1 {
 		distance := getDistanceBetweenInts(list1Val, l2[i])
 
-		total += distance
+		totalDistance += distance
 	}
 
-	fmt.Println(total)
+	// part 1 total distance
+	fmt.Printf("Day 1 Part 1: Total Distance: %d\n", totalDistance)
+
+	// Part 2: Get total similarity score
+	// similarity score is val1 * freq of val1 in list2
+
+	list2Freqs := make(map[int]int)
+
+	for _, l2Val := range l2 {
+		list2Freqs[l2Val]++
+	}
+
+	similarityScore := 0
+	for _, list1Val := range l1 {
+		similarityScore += list1Val * list2Freqs[list1Val]
+	}
+
+	fmt.Printf("Day 1 Part 2: Similarity Score: %d\n", similarityScore)
 }
 
 // total distance between two values, ensuring abs values throughout
