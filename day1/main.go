@@ -14,10 +14,10 @@ func main() {
 	fmt.Println("Day 1!")
 
 	file, err := os.Open("input.txt")
-	defer file.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
 
