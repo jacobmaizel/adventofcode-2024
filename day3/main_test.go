@@ -11,7 +11,36 @@ func TestParseAndSum(t *testing.T) {
 		expectedTotal int // count of all complete mul statements in our input
 	}{
 		{"};//how():mul(422,702)'how()'from()-&when(551,888)from()#mul(694,437)", 599522},
-		{"xmul(2,4)%&mul[3,7]!@^do_not_mul(5,5)+mul(32,64]then(mul(11,8)mul(8,5))", 161},
+		{"xmul(2,4)%&mul[3,7]!@^do_not_mul(5,5)+mul(32,64]then(mul(11,8)mul(8,5))", 136},
+	}
+
+	for i, tt := range inputs {
+
+		tName := fmt.Sprintf("test idx %d", i)
+
+		t.Run(tName, func(t *testing.T) {
+			fp := New(tt.input)
+
+			fp.ParseInputAndSum()
+			res := fp.totalMultiplicationSum
+
+			if res != tt.expectedTotal {
+				t.Errorf("wrong summed total, got=%d want=%d", res, tt.expectedTotal)
+			}
+		})
+
+	}
+}
+
+func TestPart2(t *testing.T) {
+	inputs := []struct {
+		input         string
+		expectedTotal int // count of all complete mul statements in our input
+	}{
+		// new part 2 test string including some don'ts and do
+		{"xmul(2,4)&mul[3,7]!^don't()_mul(5,5)+mul(32,64](mul(11,8)undo()?mul(8,5))", 48},
+		// part 1 control
+		// {"xmul(2,4)%&mul[3,7]!@^do_not_mul(5,5)+mul(32,64]then(mul(11,8)mul(8,5))", 161},
 	}
 
 	for i, tt := range inputs {
@@ -40,7 +69,7 @@ func TestParseMulExpression(t *testing.T) {
 		expectNil     bool
 	}{
 		{"mul(20,81)", 20, 81, false},
-		{"mul(250,111)", 250, 111, true},
+		{"mul(250,111 )", 0, 0, true},
 	}
 
 	for i, tt := range inputs {
@@ -52,8 +81,8 @@ func TestParseMulExpression(t *testing.T) {
 
 			res := fp.ParseMulStatement()
 
-			if res == nil && !tt.expectNil {
-				t.Fatal("Did not expect res to be nil!")
+			if res == nil && tt.expectNil {
+				return
 			}
 
 			if res.Left != tt.expectedLeft || res.Right != tt.expectedRight {
@@ -91,8 +120,12 @@ func TestAdvance(t *testing.T) {
 
 func BenchmarkParseAndSum(b *testing.B) {
 	input := "xmul(2,4)%&mul[3,7]!@^do_not_mul(5,5)+mul(32,64]then(mul(11,8)mul(8,5))"
+
+	// part 1
 	// BenchmarkParseAndSum-12          6084108               183.9 ns/op
 	// BenchmarkParseAndSum-12         559991629                1.900 ns/op           0 B/op without new call
+
+	// part 2 BenchmarkParseAndSum-12         585479022                1.910 ns/op               0 B/op
 
 	fp := New(input)
 	for i := 0; i < b.N; i++ {

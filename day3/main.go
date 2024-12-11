@@ -16,6 +16,11 @@ import (
 - answer: scan input for uncorrupted mul instructions, and SUM all of their results.
 */
 
+const (
+	DISABLED = iota
+	ENABLED
+)
+
 type FileParser struct {
 	input                  string
 	currIndex              int
@@ -23,10 +28,11 @@ type FileParser struct {
 	peekCh                 byte
 	ch                     byte
 	totalMultiplicationSum int
+	mode                   int // enabled / disabled. enabled by default
 }
 
 func New(input string) *FileParser {
-	fp := &FileParser{input: input}
+	fp := &FileParser{input: input, mode: ENABLED}
 	fp.Advance()
 	return fp
 }
@@ -48,11 +54,12 @@ func (i *FileParser) Advance() {
 	}
 }
 
-func (fp *FileParser) currCharIs(ch byte) bool {
-	return fp.ch == ch
+func (fp *FileParser) peekCharIs(ch byte) bool {
+	return fp.peekCh == ch
 }
 
-func (fp *FileParser) ParseParameters() {
+func (fp *FileParser) currCharIs(ch byte) bool {
+	return fp.ch == ch
 }
 
 func (fp *FileParser) ParseMulStatement() *MulExpression {
@@ -101,7 +108,8 @@ func (fp *FileParser) ParseMulStatement() *MulExpression {
 func (fp *FileParser) ParseInputAndSum() {
 	for fp.ch != 0 {
 
-		if fp.ch == 'm' {
+		switch fp.ch {
+		case 'm':
 			// fmt.Printf("Got m at %d\n", fp.currIndex)
 			mulStmt := fp.ParseMulStatement()
 			if mulStmt == nil {
@@ -110,10 +118,57 @@ func (fp *FileParser) ParseInputAndSum() {
 				continue
 			}
 
-			fp.totalMultiplicationSum += mulStmt.Calc()
+			if fp.mode == ENABLED {
+				// only saving the calc if we are currently enabled.
+				fp.totalMultiplicationSum += mulStmt.Calc()
+			}
+
+		case 'd':
+			// fmt.Printf("Parsing mod statement at %d\n", fp.currIndex)
+			fp.ParseModifierStatement()
 		}
 
 		fp.Advance()
+	}
+}
+
+// do() or don't(), enables / disables the parser from saving the calc of following muls
+// assumes it is called when currChar is 'd'
+func (fp *FileParser) ParseModifierStatement() {
+	if !fp.peekCharIs('o') {
+		return
+	}
+
+	word := fp.readWord()
+	// fmt.Printf("Mod word: %s   curr token is: %s\n", word, string(fp.ch))
+
+	switch word {
+	case "do":
+		if !fp.currCharIs('(') && fp.peekCharIs(')') {
+			// fmt.Println("do did not have () after")
+			return
+		}
+		// fmt.Printf("Flipping to enabled\n")
+		fp.mode = ENABLED
+
+	case "don":
+		if fp.currCharIs('\'') {
+			if fp.peekCharIs('t') {
+				fp.Advance() // on 't'
+				fp.Advance() // now should be on opening paren
+				if fp.currCharIs('(') && fp.peekCharIs(')') {
+					fp.Advance() // on closing paren
+					fp.Advance() // now on item AFTER the closing paren
+
+					// fmt.Printf("Flipping to disabled, withcurrent token now being: %s\n", string(fp.ch))
+					fp.mode = DISABLED
+
+				}
+			}
+		} else {
+			// fmt.Printf("something went wrong in dont parsing, ending at char %s\n", string(fp.ch))
+		}
+
 	}
 }
 
@@ -156,7 +211,7 @@ func main() {
 
 	fp.ParseInputAndSum()
 
-	fmt.Printf("D2P1: Total sum of multiplations: %d", fp.totalMultiplicationSum)
+	fmt.Printf("AOC D2: Total sum of multiplations: %d", fp.totalMultiplicationSum)
 }
 
 func isDigit(ch byte) bool {
