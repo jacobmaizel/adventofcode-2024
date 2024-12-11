@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -16,10 +17,33 @@ import (
 
 Goal: Figure out which reports are "safe"
 
+Part 1:
 - Report is considered safe when both of the following are true:
 1. the levels are either ALL INCREASING or ALL DECREASING
 2. any two adjacent levels differ by ATLEAST ONE and ATMOST THREE
+
+Part 1 bench: BenchmarkReportSafety-12        226556745                5.184 ns/op
+------------
+
+Part 2:
+- for each report, if the report is unsafe,
+- remove 1 level at a time and re test with that new array until we get a successful run
+- if we go through every single character and still have no success, it is truly unsafe
+
+Part 2 bench: BenchmarkProcessReport-12       184762862                6.346 ns/op
 */
+
+const (
+	UNSAFE = iota
+	SAFE
+)
+
+const (
+	INVALID = iota
+	INCREASING
+	DECREASING
+)
+
 func main() {
 	file, err := os.Open("aoc-day2-input.txt")
 	if err != nil {
@@ -31,40 +55,53 @@ func main() {
 	safeReportCount := 0
 
 	for scanner.Scan() {
-		report := strings.Split(scanner.Text(), " ")
+		report := extractReportRow(scanner.Text())
 
-		reportIntList := []int{}
-
-		for _, r := range report {
-			v, _ := strconv.Atoi(r)
-			reportIntList = append(reportIntList, v)
-		}
-
-		safeReportCount += reportSafetyCheck(reportIntList)
+		calc := processReport(report)
+		safeReportCount += calc
 	}
+	fmt.Printf("d2p1: %d Reports Safe\n", safeReportCount)
 }
 
-// checks
-// 1. is the entire row all increasing or all decreasing?
-// is the difference between each level > 0 and <=3 ?
-// returns 1 if safe, 0 if unsafe
+func extractReportRow(in string) []int {
+	report := strings.Split(in, " ")
+
+	reportIntList := []int{}
+
+	for _, r := range report {
+		v, _ := strconv.Atoi(r)
+		reportIntList = append(reportIntList, v)
+	}
+
+	return reportIntList
+}
+
+// handles checking report safety and re running safety check with removal if needed
+func processReport(report []int) int {
+	if reportSafetyCheck(report) == SAFE {
+		// already a safe report
+		return SAFE
+	}
+
+	// start the process of removing 1 level at a time and re checking report safety
+	// when we get a safe, just return it
+	for i := range report {
+		if reportSafetyCheck(remove(i, report)) == SAFE {
+			return SAFE
+		}
+	}
+
+	// no removal would make this report safe
+	return UNSAFE
+}
+
 func reportSafetyCheck(report []int) int {
 	ptr1 := 0
 	ptr2 := 1
 
 	n := len(report)
 
-	reportDirection := direction(report[ptr1], report[ptr2])
-	if reportDirection == INVALID {
-		return 0
-	}
-
-	if !validDifference(report[ptr1], report[ptr2]) {
-		return 0
-	}
-
-	ptr1++
-	ptr2++
+	reportDirection := INVALID
 
 	for ptr2 < n {
 
@@ -73,14 +110,18 @@ func reportSafetyCheck(report []int) int {
 
 		currDirection := direction(val1, val2)
 
+		if reportDirection == INVALID {
+			reportDirection = currDirection
+		}
+
 		// if we change directions or if we have matching values, unsafe
 		if currDirection != reportDirection || currDirection == INVALID {
-			return 0
+			return UNSAFE
 		}
 
 		// if the diff between the two levels are out of bounds, unsafe
 		if !validDifference(val1, val2) {
-			return 0
+			return UNSAFE
 		}
 
 		// move ptrs
@@ -88,14 +129,16 @@ func reportSafetyCheck(report []int) int {
 		ptr2++
 	}
 
-	return 1
+	return SAFE
 }
 
-const (
-	INVALID = iota
-	INCREASING
-	DECREASING
-)
+func remove(idx int, list []int) []int {
+	res := []int{}
+	res = append(res, list[:idx]...)
+	res = append(res, list[idx+1:]...)
+
+	return res
+}
 
 func direction(i1, i2 int) int {
 	if i1 > i2 {
