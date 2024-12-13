@@ -13,11 +13,6 @@ Day 4 - Ceres Search
 word search for ALL INSTANCES of XMAS (18 times)
 
 - allows for horizontal, vertical, diagonal, backwards, and overlapping other words.
-
-
-NOTES::::::::::::::;
-- load it all into a grid? so we can do diagonal / vertical checks fast just by
-adjusting 2-dimensional indexing
 */
 
 const (
@@ -71,20 +66,24 @@ func (ig *InputGrid) FindDiagonal(x, y int) int {
 	for _, dir := range DIAG_DIRS {
 		xDir := dir[0]
 		yDir := dir[1]
-		var word []byte
+		// var word []byte
+		match := true
 
 		for i := range len(XMAS) {
 			newX := x + (i * xDir)
 			newY := y + (i * yDir)
 
 			if newX < 0 || newY < 0 || newX >= ig.rows || newY >= ig.cols {
+				match = false
 				break
 			}
 
-			currVal := ig.data[newX][newY]
-			word = append(word, currVal)
+			if ig.data[newX][newY] != XMAS[i] {
+				match = false
+				break
+			}
 		}
-		if string(word) == XMAS {
+		if match {
 			total++
 		}
 	}
@@ -93,32 +92,16 @@ func (ig *InputGrid) FindDiagonal(x, y int) int {
 }
 
 func (ig *InputGrid) searchLeftRight(x, y, dir int) int {
-	res := []byte{}
-
 	for i := range len(XMAS) {
 		point := ig.data[x][y+(i*dir)]
-		res = append(res, point)
+		if point != XMAS[i] {
+			return NOTFOUND
+		}
 	}
-
-	found := string(res)
-
-	if found == XMAS {
-		return FOUND
-	}
-
-	return NOTFOUND
+	return FOUND
 }
 
-/*
-Fails if:
-1. cant look far enough to the left
-2. cant look far enough to the right
-*/
 func (ig *InputGrid) FindHorizontal(x, y int) int {
-	if ig.data[x][y] != 'X' {
-		return 0
-	}
-
 	total := 0
 	if y-len(XMAS) >= -1 {
 		total += ig.searchLeftRight(x, y, LEFT)
@@ -132,19 +115,13 @@ func (ig *InputGrid) FindHorizontal(x, y int) int {
 }
 
 func (ig *InputGrid) searchUpDown(x, y, mod int) int {
-	res := []byte{}
 	for i := range len(XMAS) {
 		point := ig.data[x+(i*mod)][y]
-		res = append(res, point)
+		if point != XMAS[i] {
+			return NOTFOUND
+		}
 	}
-
-	found := string(res)
-
-	if found == XMAS {
-		return FOUND
-	}
-
-	return NOTFOUND
+	return FOUND
 }
 
 func (ig *InputGrid) FindVertical(x, y int) int {
@@ -161,29 +138,13 @@ func (ig *InputGrid) FindVertical(x, y int) int {
 	return total
 }
 
-func (im *InputGrid) SearchFromPoint(x, y int) int {
-	return 0
-}
-
-// func (im *InputGrid) WordSearch() int {
-// 	total := 0
-// 	for x := 0; x < im.rows; x++ {
-// 		for y := 0; y < im.cols; y++ {
-// 			total += im.FindVertical(x, y)
-// 			total += im.FindHorizontal(x, y)
-// 			total += im.FindDiagonal(x, y)
-// 		}
-// 	}
-// 	return total
-// }
-
 func (im *InputGrid) WordSearch() int {
 	total := 0
 	for x := range im.rows {
 		for y := range im.cols {
-			// if im.data[x][y] != 'X' {
-			// 	continue
-			// }
+			if im.data[x][y] != 'X' {
+				continue
+			}
 			total += im.FindVertical(x, y)
 			total += im.FindHorizontal(x, y)
 			total += im.FindDiagonal(x, y)

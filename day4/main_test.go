@@ -162,16 +162,6 @@ func TestSeekDiagonal(t *testing.T) {
 			startPoint:   []int{0, 0},
 			expectedXmas: 2,
 		},
-		// {
-		// 	input: []string{
-		// 		"XXXX",
-		// 		"MMMM",
-		// 		"XMAA",
-		// 		"SSSS",
-		// 		"ASDF",
-		// 	},
-		// 	expectedXmas: 0,
-		// },
 	}
 
 	for i, tt := range tests {
@@ -197,7 +187,10 @@ func TestSeekDiagonal(t *testing.T) {
 
 func BenchmarkWordSearch(b *testing.B) {
 	/*
-		initial: BenchmarkWordSearch-12   789   1279141 ns/op  484962 B/op  60602 allocs/op
+		   initial:  789   1279141 ns/op  484962 B/op                        60602 allocs/op
+		   skipping non x:  1932   622397 ns/op                 236697 B/op  29580 allocs/op
+		   early return for mismatch byte:  2901  412033 ns/op  119592 B/op  14944 allocs/op
+			 fixes for diagonal early return: 4490  262942 ns/op      23 B/op  0 allocs/op
 	*/
 	file, _ := os.Open("aoc-day4-input.txt")
 	defer file.Close()
