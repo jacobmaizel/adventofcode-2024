@@ -185,6 +185,51 @@ func TestSeekDiagonal(t *testing.T) {
 	}
 }
 
+func TestPart2(t *testing.T) {
+	tests := []struct {
+		input        []string
+		startPoint   []int
+		expectedXmas int
+	}{
+		{
+			input: []string{
+				".M.S......",
+				"..A..MSMS.",
+				".M.S.MAA..",
+				"..A.ASMSM.",
+				".M.S.M....",
+				"..........",
+				"S.S.S.S.S.",
+				".A.A.A.A..",
+				"M.M.M.M.M.",
+				"..........",
+			},
+			startPoint:   []int{0, 0},
+			expectedXmas: 9,
+		},
+	}
+
+	for i, tt := range tests {
+		n := fmt.Sprintf("idx=%d", i)
+
+		t.Run(n, func(t *testing.T) {
+			im := NewInputGrid(tt.input)
+
+			// im.printGrid()
+			total := 0
+			for x := range im.rows {
+				for y := range im.cols {
+					total += im.SearchCrossP2(x, y)
+				}
+			}
+
+			if total != tt.expectedXmas {
+				t.Fatalf("wrong horizontal total got=%d, want=%d", total, tt.expectedXmas)
+			}
+		})
+	}
+}
+
 func BenchmarkWordSearch(b *testing.B) {
 	/*
 		   initial:  789   1279141 ns/op  484962 B/op                        60602 allocs/op

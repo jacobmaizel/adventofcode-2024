@@ -13,10 +13,23 @@ Day 4 - Ceres Search
 word search for ALL INSTANCES of XMAS (18 times)
 
 - allows for horizontal, vertical, diagonal, backwards, and overlapping other words.
+
+
+Part 2: X-MAS instead of XMAS
+
+M.S
+.A.
+M.S
+
+
+* Within the X, each MAS can be written forwards or backwards.
+
+
 */
 
 const (
 	XMAS     = "XMAS"
+	MAS      = "MAS"
 	NOTFOUND = 0
 	FOUND    = 1
 )
@@ -107,7 +120,7 @@ func (ig *InputGrid) FindHorizontal(x, y int) int {
 		total += ig.searchLeftRight(x, y, LEFT)
 	}
 
-	if y+len(XMAS) <= ig.cols { // total cols - len(XMAS) >= x
+	if y+len(XMAS) <= ig.cols {
 		total += ig.searchLeftRight(x, y, RIGHT)
 	}
 
@@ -154,6 +167,83 @@ func (im *InputGrid) WordSearch() int {
 	return total
 }
 
+var LeftTopToRightBot = [][]int{
+	{LEFT, UP},
+	{RIGHT, DOWN},
+}
+
+var LeftBotToRightTop = [][]int{
+	{LEFT, DOWN},
+	{RIGHT, UP},
+}
+
+func (ig *InputGrid) SearchCrossP2(x, y int) int {
+	s1 := []byte{}
+	for _, dir := range LeftTopToRightBot {
+
+		newX, newY := x+dir[0], y+dir[1]
+
+		if newX < 0 || newY < 0 || newX >= ig.rows || newY >= ig.cols {
+			return NOTFOUND // dir loop
+		}
+
+		newPoint := ig.data[newX][newY]
+
+		// if newPoint != 'M' && newPoint != 'S' {
+		//   return NOTFOUND
+		// }
+
+		s1 = append(s1, newPoint)
+
+	} // left to right
+	s := string(s1)
+	if s != "MS" && s != "SM" {
+		return NOTFOUND
+	}
+
+	s2 := []byte{}
+	for _, dir := range LeftBotToRightTop {
+
+		newX, newY := x+dir[0], y+dir[1]
+
+		if newX < 0 || newY < 0 || newX >= ig.rows || newY >= ig.cols {
+			return NOTFOUND // dir loop
+		}
+
+		newPoint := ig.data[newX][newY]
+
+		if newPoint != 'M' && newPoint != 'S' {
+			return NOTFOUND
+		}
+
+		s2 = append(s2, newPoint)
+
+	} // left to right
+	s = string(s2)
+	if s != "MS" && s != "SM" {
+		return NOTFOUND
+	}
+
+	return FOUND
+}
+
+func (ig *InputGrid) XMASCrossSearch() int {
+	total := 0
+	for x := range ig.rows {
+		for y := range ig.cols {
+			currPoint := ig.data[x][y]
+			if currPoint != 'A' {
+				continue
+			}
+
+			total += ig.SearchCrossP2(x, y)
+
+		} // col loop
+	} // rows loop
+
+	return total
+}
+
 func main() {
 	fmt.Println("aoc day 4")
 	file, _ := os.Open("aoc-day4-input.txt")
@@ -163,5 +253,8 @@ func main() {
 	im := NewInputGrid(lines[:len(lines)-1])
 	res := im.WordSearch()
 
+	p2Res := im.XMASCrossSearch()
+
 	fmt.Printf("D4P1 XMAS Count= %d\n", res)
+	fmt.Printf("D4P2 X-MAS Count= %d\n", p2Res)
 }
