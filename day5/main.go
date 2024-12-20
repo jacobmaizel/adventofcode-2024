@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -21,16 +22,6 @@ part 2:
 for each of the INCORRECTLY ordered updates,
 use the page ordering rules to sort the page numbers in the right order
 then sum their midpoints as we did before
-
-p2 notes:
-how to sort?
-idea 1: move the offending page back 1 by 1 until its behind the before part of the rule?
-    then the problem is do we mess up other rules that depend on that?
-
-idea 2:
-build some sort of dependency graph using the broke rules to build a plan
-13,24,53,64,12,82
-if rule 1 and rule 2 (13|82)
 */
 
 type Rule struct {
@@ -48,7 +39,20 @@ type Input struct {
 	printLines  [][]int
 }
 
-func NewInput(read io.Reader) *Input {
+func NewInputFromParts(lines [][]int, rules []Rule) *Input {
+	inp := &Input{
+		printLines:  lines,
+		rulesLookup: make(map[int][]Rule),
+	}
+
+	for _, r := range rules {
+		inp.rulesLookup[r.before] = append(inp.rulesLookup[r.before], r)
+	}
+
+	return inp
+}
+
+func NewInputFromReader(read io.Reader) *Input {
 	inp := &Input{
 		rulesLookup: make(map[int][]Rule),
 		printLines:  [][]int{},
@@ -90,68 +94,111 @@ func NewInput(read io.Reader) *Input {
 	return inp
 }
 
-func (in *Input) CheckValidity(printRow []int) ([]Rule, bool) {
+// seperate validity check that does not have to worry about returning the rules
+func (in *Input) rowValid(printRow []int) bool {
 	seenPages := make(map[int]bool)
-
-	brokenRules := []Rule{}
-
 	for _, page := range printRow {
-		for _, beforeRule := range in.rulesLookup[page] {
-			if ok := seenPages[beforeRule.after]; ok {
-				brokenRules = append(brokenRules, beforeRule)
+		for _, rule := range in.rulesLookup[page] {
+			if ok := seenPages[rule.after]; ok {
+				return false
 			}
 		}
 		seenPages[page] = true
 	}
+	return true
+}
 
-	if len(brokenRules) > 0 {
-		return brokenRules, false
+func (in *Input) getAllRulesForRow(printRow []int) []Rule {
+	allRules := []Rule{}
+	for _, page := range printRow {
+		for _, rule := range in.rulesLookup[page] {
+			if slices.Contains(printRow, rule.before) && slices.Contains(printRow, rule.after) {
+				allRules = append(allRules, rule)
+			}
+		}
 	}
 
-	return nil, true
+	return allRules
 }
 
 // part 2, sum correctly sorted updates' midpoints
 func (in *Input) CalcP2() int {
 	total := 0
 
-	for _, printRow := range in.printLines {
-		if brokenRules, valid := in.CheckValidity(printRow); !valid {
+	for i, printRow := range in.printLines {
+		if valid := in.rowValid(printRow); !valid {
 
-			// DEBUG
-			fmt.Printf("Broken rules for row=%+v\n", printRow)
-			for _, r := range brokenRules {
-				fmt.Printf("(%d|%d)\n", r.before, r.after)
+			allRules := in.getAllRulesForRow(printRow)
+
+			res := in.topoSort(allRules)
+
+			if !slices.Equal(res, in.printLines[i]) {
+				mid := res[len(res)/2]
+				total += mid
 			}
-			fmt.Println("---------------------------")
-
-			sortedRow := in.SortUpdateRow(printRow)
-
-			mid := sortedRow[len(sortedRow)/2]
-
-			total += mid
 		}
 	}
 
 	return total
 }
 
-func (in *Input) SortUpdateRow(printRow []int) []int {
-	return printRow
+func buildGraphWithIndegreeCount(rules []Rule) (map[int][]int, map[int]int) {
+	graph := make(map[int][]int)
+	inDegreeCount := make(map[int]int)
+
+	for _, r := range rules {
+		graph[r.before] = append(graph[r.before], r.after)
+		inDegreeCount[r.after]++
+
+		if _, exists := inDegreeCount[r.before]; !exists {
+			inDegreeCount[r.before] = 0
+		}
+	}
+
+	return graph, inDegreeCount
+}
+
+// kahns alg to topologically sort our DAG
+func (in *Input) topoSort(rules []Rule) []int {
+	depGraph, inDegree := buildGraphWithIndegreeCount(rules)
+
+	result := []int{}
+	queue := []int{}
+
+	// prefill the queue with nodes that have no incoming edges
+	for node, degree := range inDegree {
+		if degree == 0 {
+			queue = append(queue, node)
+		}
+	}
+
+	// start
+	for len(queue) > 0 {
+		currNode := queue[0]
+		queue = queue[1:]
+
+		result = append(result, currNode)
+
+		for _, neighbor := range depGraph[currNode] {
+			inDegree[neighbor]--
+			if inDegree[neighbor] == 0 {
+				queue = append(queue, neighbor)
+			}
+
+		}
+	}
+
+	return result
 }
 
 func (in *Input) CalcP1() int {
 	total := 0
-
 	for _, printRow := range in.printLines {
-		if _, valid := in.CheckValidity(printRow); valid {
-
+		if valid := in.rowValid(printRow); valid {
 			mid := printRow[len(printRow)/2]
-
 			total += mid
 		}
 	}
-
 	return total
 }
 
@@ -161,7 +208,7 @@ func main() {
 
 	defer file.Close()
 
-	inp := NewInput(file)
+	inp := NewInputFromReader(file)
 
 	res := inp.CalcP1()
 
