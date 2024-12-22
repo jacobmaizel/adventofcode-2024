@@ -88,6 +88,95 @@ func TestAutoMovement(t *testing.T) {
 	}
 }
 
+// func TestObsPlacementLoopCount(t *testing.T) {
+// 	tests := []struct {
+// 		grid                   []string
+// 		expectedObstPlacements int
+// 	}{
+// 		{
+// 			[]string{
+// 				"....#.....",
+// 				".........#",
+// 				"..........",
+// 				"..#.......",
+// 				".......#..",
+// 				"..........",
+// 				".#..^.....",
+// 				"........#.",
+// 				"#.........",
+// 				"......#...",
+// 			}, 6,
+// 		},
+// 	}
+
+// 	for i, tt := range tests {
+// 		n := fmt.Sprintf("idx %d", i)
+
+// 		t.Run(n, func(t *testing.T) {
+// 			m := NewMapFromGrid(tt.grid)
+
+// 			res := m.simulateDifferentObstructionPositions()
+
+// 			if tt.expectedObstPlacements != res {
+// 				t.Fatalf("wrong placement count: want=%d, got=%d\n", tt.expectedObstPlacements, res)
+// 			}
+// 		})
+// 	}
+// }
+
+// func TestGuardLoop(t *testing.T) {
+// 	tests := []struct {
+// 		grid       []string
+// 		expectLoop bool
+// 	}{
+// 		{
+// 			[]string{
+// 				"....#.....",
+// 				".........#",
+// 				"..........",
+// 				"..#.......",
+// 				".......#..",
+// 				"..........",
+// 				".#..^.....",
+// 				"........#.",
+// 				"#.........",
+// 				"......#...",
+// 			}, false,
+// 		},
+// 		{
+// 			[]string{
+// 				"....#.....",
+// 				".........#",
+// 				"..........",
+// 				"..#.......",
+// 				".......#..",
+// 				"..........",
+// 				".#.#^.....",
+// 				"........#.",
+// 				"#.........",
+// 				"......#...",
+// 			}, true,
+// 		},
+// 	}
+
+// 	for i, tt := range tests {
+// 		n := fmt.Sprintf("idx %d", i)
+
+// 		t.Run(n, func(t *testing.T) {
+// 			m := NewMapFromGrid(tt.grid)
+
+// 			m.moveGuard()
+
+// 			if m.guardLeavingGrid && m.stuckInLoop && tt.expectLoop == m.stuckInLoop {
+// 				t.Fatal("cant leave and also be in a loop..")
+// 			}
+// 			if tt.expectLoop != m.stuckInLoop {
+// 				t.Fatalf("mismatch expect loop: got=%t, want=%t\n", m.stuckInLoop, tt.expectLoop)
+// 			}
+// 		})
+// 	}
+// }
+
 /*
 initial
 569947948                1.904 ns/op           0 B/op          0 allocs/op
