@@ -197,8 +197,9 @@ func BenchmarkDay6p1(b *testing.B) {
 /*
 initial
 1        4134710709 ns/op        5821483544 B/op    2209030 allocs/op
+only using guards original path to check
+2         914503667 ns/op         142809960 B/op     214263 allocs/op
 */
-
 
 func BenchmarkDay6p2(b *testing.B) {
 	f, _ := os.Open("day6-aoc-input.txt")

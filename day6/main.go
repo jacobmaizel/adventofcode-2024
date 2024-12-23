@@ -48,7 +48,7 @@ type Map struct {
 }
 
 func (m *Map) reset(previousObstPos *Position, prevVal byte) {
-	m.distinctPositions = make(map[Position]byte)
+	// m.distinctPositions = make(map[Position]byte)
 	m.samePosAndDirCount = 0
 	m.guardLeavingGrid = false
 	m.stuckInLoop = false
@@ -288,20 +288,23 @@ func (m *Map) moveGuard() {
 
 func (m *Map) simulateDifferentObstructionPositions() int {
 	totalLoops := 0
-	for r := range m.rows {
-		for c := range m.cols {
-			prevVal := m.grid[r][c]
-			prevPos := &Position{
-				row: r,
-				col: c,
-			}
-			m.setGridCoord(r, c, OBSTRUCTION)
-			m.moveGuard()
-			if m.stuckInLoop {
-				totalLoops++
-			}
-			m.reset(prevPos, prevVal)
+	m.moveGuard()
+	m.reset(nil, '0')
+	for pos := range m.distinctPositions {
+		if pos.row == m.origGuardPos.row && pos.col == m.origGuardPos.col {
+			continue
 		}
+		prevVal := m.grid[pos.row][pos.col]
+		prevPos := &Position{
+			row: pos.row,
+			col: pos.col,
+		}
+		m.setGridCoord(pos.row, pos.col, OBSTRUCTION)
+		m.moveGuard()
+		if m.stuckInLoop {
+			totalLoops++
+		}
+		m.reset(prevPos, prevVal)
 	}
 
 	return totalLoops
