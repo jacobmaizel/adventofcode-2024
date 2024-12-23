@@ -7,6 +7,15 @@ import (
 	"os"
 )
 
+type State struct {
+	pos Position
+	dir byte
+}
+
+func (s *State) String() string {
+	return fmt.Sprintf("%s -> %s", s.pos, string(s.dir))
+}
+
 type Position struct {
 	row int
 	col int
@@ -19,24 +28,27 @@ func NewPos(row, col int) *Position {
 	}
 }
 
+func (pos Position) String() string {
+	return fmt.Sprintf("row=%d, col=%d", pos.row, pos.col)
+}
+
 type Map struct {
-	currGuardPos         *Position
-	origGuardPos         *Position
-	origGuardDir         byte
-	distinctPositions    map[Position]byte // set of unique positions
-	stoppingPointsLookup map[Position]byte // used to determine only stopping points and dirs, not each individual point.
-	samePosAndDirCount   int               // how many times we have been in the same position facing the same way
-	grid                 [][]byte
-	origGrid             [][]byte
-	rows                 int
-	cols                 int
-	guardLeavingGrid     bool
-	stuckInLoop          bool // flag to determine if we are in a loop
+	currGuardPos       *Position
+	origGuardPos       *Position
+	origGuardDir       byte
+	distinctPositions  map[Position]byte // set of unique positions
+	samePosAndDirCount int               // how many times we have been in the same position facing the same way
+	grid               [][]byte
+	origGrid           [][]byte
+	rows               int
+	cols               int
+	guardLeavingGrid   bool
+	stuckInLoop        bool // flag to determine if we are in a loop
+	visited            map[State]bool
 }
 
 func (m *Map) reset(previousObstPos *Position, prevVal byte) {
 	m.distinctPositions = make(map[Position]byte)
-	m.stoppingPointsLookup = make(map[Position]byte)
 	m.samePosAndDirCount = 0
 	m.guardLeavingGrid = false
 	m.stuckInLoop = false
@@ -45,6 +57,8 @@ func (m *Map) reset(previousObstPos *Position, prevVal byte) {
 	if previousObstPos != nil {
 		m.setGridCoord(previousObstPos.row, previousObstPos.col, prevVal)
 	}
+
+	m.visited = make(map[State]bool)
 
 	copy(m.origGrid, m.grid)
 
@@ -69,25 +83,8 @@ guard will eventually go out of the map, ie. facing right and hitting right boun
 count all unique positions, INCLUDING start position
 
 --- Part 2
-
 count of different positions we can use to put an obstruction
 that would get the guard stuck in a loop
-
-part 2 idea:
-brute force -> bunch of go routines each with its own version of the map with
-a unique spot for the new obstruction.
-each goroutine will use its map and test for a cycle.
-if it finds one, report back on a channel (fan in)
-
-cycle testing:
-build a linked list and do fast+slow runners?
-
-we are in a loop when:
-1. we hit a place that we have already been
-2. We are facing the same direction that we did when we were last there
-3. and we did this 4 times.
-4. the only way we would be in the same spot, and facing the same direciton 4 times, is
-if we were in a box.
 */
 
 var (
@@ -98,7 +95,7 @@ var (
 )
 
 func NewMapFromReader(r io.Reader) *Map {
-	m := &Map{distinctPositions: make(map[Position]byte), grid: [][]byte{}, stoppingPointsLookup: make(map[Position]byte)}
+	m := &Map{distinctPositions: make(map[Position]byte), grid: [][]byte{}, visited: make(map[State]bool)}
 	s := bufio.NewScanner(r)
 	for s.Scan() {
 		rowString := s.Text()
@@ -110,7 +107,7 @@ func NewMapFromReader(r io.Reader) *Map {
 			if currVal == UP || currVal == DOWN || currVal == LEFT || currVal == RIGHT {
 				m.currGuardPos = &Position{row: row, col: col}
 				m.saveGuardPosition()
-				// m.saveStoppingPoint()
+				m.saveStoppingPoint()
 				m.origGuardDir = currVal
 				m.origGuardPos = &Position{row: row, col: col}
 			}
@@ -122,7 +119,7 @@ func NewMapFromReader(r io.Reader) *Map {
 }
 
 func NewMapFromGrid(g []string) *Map {
-	m := &Map{distinctPositions: make(map[Position]byte), grid: [][]byte{}, stoppingPointsLookup: make(map[Position]byte)}
+	m := &Map{distinctPositions: make(map[Position]byte), grid: [][]byte{}, visited: make(map[State]bool)}
 	for _, l := range g {
 		m.grid = append(m.grid, []byte(l))
 		m.origGrid = append(m.origGrid, []byte(l))
@@ -133,7 +130,7 @@ func NewMapFromGrid(g []string) *Map {
 			if posVal == UP || posVal == DOWN || posVal == LEFT || posVal == RIGHT {
 				m.currGuardPos = &Position{row: row, col: col}
 				m.saveGuardPosition()
-				// m.saveStoppingPoint()
+				m.saveStoppingPoint()
 				m.origGuardDir = posVal
 				m.origGuardPos = &Position{row: row, col: col}
 			}
@@ -144,7 +141,7 @@ func NewMapFromGrid(g []string) *Map {
 	return m
 }
 
-func (m *Map) printGrid() {
+func (m *Map) PrintGrid() {
 	for r := range m.grid {
 		for c := range m.grid[r] {
 			fmt.Print(string(m.grid[r][c]))
@@ -161,22 +158,18 @@ func (m *Map) saveGuardPosition() {
 }
 
 // only used when the guard stops and turns. helpful for cycles!
-// func (m *Map) saveStoppingPoint() {
-// 	currGuardPositionChar := m.getGuardDir()
-// 	m.stoppingPointsLookup[*m.currGuardPos] = currGuardPositionChar
-// }
-
-func (m *Map) checkGuardInLoop() {
-	if dir, ok := m.stoppingPointsLookup[*m.currGuardPos]; ok && m.getGuardDir() == dir {
-		m.samePosAndDirCount++
-		if m.samePosAndDirCount == 4 {
-			fmt.Printf("GOT A LOOP! current stopping poitns:%+v\n\n", m.stoppingPointsLookup)
-			m.printGrid()
-			m.stuckInLoop = true
-		}
-	} else {
-		m.samePosAndDirCount = 0
+func (m *Map) saveStoppingPoint() {
+	newState := State{
+		pos: *m.currGuardPos,
+		dir: m.getGuardDir(),
 	}
+
+	if seen := m.visited[newState]; seen {
+		m.stuckInLoop = true
+		return
+
+	}
+	m.visited[newState] = true
 }
 
 func (m *Map) setGridCoord(row, col int, val byte) {
@@ -276,11 +269,7 @@ func (m *Map) turnGuard(fromDir byte) {
 // returns when guard is marked as out of bounds
 func (m *Map) moveGuard() {
 	for !m.guardLeavingGrid && !m.stuckInLoop {
-		// fmt.Println("START---------------")
-		// m.printGrid()
 		orig := m.getGuardDir()
-		// fmt.Println("Moving guard from dir", string(orig))
-		// fmt.Printf("\nin move.. pos=%+v\n", m.currGuardPos)
 		switch orig {
 		case UP:
 			m.guardUp()
@@ -290,59 +279,29 @@ func (m *Map) moveGuard() {
 			m.guardDown()
 		case LEFT:
 			m.guardLeft()
-		default:
-			fmt.Printf("How do we not have a valid dir char?%+v\n", m.currGuardPos)
-			m.printGrid()
 		}
-		fmt.Println("after move switch, guard is now at", m.currGuardPos)
 		m.isGuardLeavingGrid(orig)
-		fmt.Println("Checked if guard left", m.guardLeavingGrid)
-		fmt.Println("Saved stop point")
 		m.turnGuard(orig)
-		fmt.Println("turned guard")
-		// m.saveStoppingPoint()
-		fmt.Println("Saved stopping point")
-		m.checkGuardInLoop()
-		fmt.Println("Checked if guard is not in loop", m.stuckInLoop)
-
-		// fmt.Println("AFTER-----------")
-		// m.printGrid()
+		m.saveStoppingPoint()
 	}
-	// fmt.Printf("Exiting move guard:: loop=%t, left grid=%t, -- ending position=%+v\n", m.stuckInLoop, m.guardLeavingGrid, m.currGuardPos)
 }
 
-// brute forces every single position on the map and tests each one to see if
-// putting an obstruction there causes a loop
 func (m *Map) simulateDifferentObstructionPositions() int {
 	totalLoops := 0
 	for r := range m.rows {
 		for c := range m.cols {
-			// m.reset(&Position{row: r, col: c})
-
-			if r == m.origGuardPos.row && c == m.origGuardPos.col {
-				continue
-			}
-
 			prevVal := m.grid[r][c]
-
+			prevPos := &Position{
+				row: r,
+				col: c,
+			}
 			m.setGridCoord(r, c, OBSTRUCTION)
-
 			m.moveGuard()
-
 			if m.stuckInLoop {
-				fmt.Println("loop for obst at ", r, c)
-				// m.printGrid()
 				totalLoops++
 			}
-			// m.printGrid()
-
-			m.reset(&Position{row: r, col: c}, prevVal)
-
+			m.reset(prevPos, prevVal)
 		}
-		// only do first row to test
-		// if r > 2 {
-		// 	break
-		// }
 	}
 
 	return totalLoops
@@ -352,14 +311,14 @@ func main() {
 	file, _ := os.Open("day6-aoc-input.txt")
 	defer file.Close()
 
-	m := NewMapFromReader(file)
+	// m := NewMapFromReader(file)
 
-	m.moveGuard()
+	// m.moveGuard()
 
-	fmt.Printf("Day 6 Part 1 ans=%d\n", len(m.distinctPositions))
+	// fmt.Printf("Day 6 Part 1 ans=%d\n", len(m.distinctPositions))
 
-	// p2 := NewMapFromReader(file)
-	// p2Res := p2.simulateObstPlacmentLoopCount()
+	p2 := NewMapFromReader(file)
+	p2Res := p2.simulateDifferentObstructionPositions()
 
-	// fmt.Printf("Day 6 Part 2 ans=%d\n", p2Res)
+	fmt.Printf("Day 6 Part 2 ans=%d\n", p2Res)
 }
