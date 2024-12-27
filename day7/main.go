@@ -17,8 +17,9 @@ Calc total of all sums whos equations we can complete using the given + and * op
 */
 
 const (
-	MUL = Operator('*')
-	ADD = Operator('+')
+	MUL    = Operator('*')
+	ADD    = Operator('+')
+	CONCAT = Operator('&') // instead of ||
 )
 
 type Operator byte
@@ -45,11 +46,8 @@ func NewInput(r io.Reader) *Input {
 	s := bufio.NewScanner(r)
 	for s.Scan() {
 		line := strings.TrimSpace(s.Text())
-		// fmt.Println("LINE", line)
 		parts := strings.Split(line, ":")
-		// fmt.Println("parts", parts)
 		rawAns := parts[0]
-		// fmt.Println("Raw ans", rawAns)
 		rawOps := strings.Split(parts[1][1:], " ") // skip leading space
 		rawIntOps := []int{}
 		rawIntAns, _ := strconv.Atoi(rawAns)
@@ -58,18 +56,15 @@ func NewInput(r io.Reader) *Input {
 			rawIntOps = append(rawIntOps, s)
 		}
 		ni := NewStatement(rawIntAns, rawIntOps)
-		// fmt.Println("NEW STATEMENT", ni)
 		i.statements = append(i.statements, ni)
 	}
-
-	// fmt.Println("Created statements", i.statements)
 
 	return i
 }
 
 // brute force generates list of lists of every permutation of ops for a statement
 // num operands- 1 amt of operators needed
-func genComb(items []Operator, size int) [][]Operator {
+func genComb(items []Operator, size int, s Statement) [][]Operator {
 	if size == 0 {
 		return [][]Operator{{}}
 	}
@@ -77,24 +72,25 @@ func genComb(items []Operator, size int) [][]Operator {
 	ans := [][]Operator{}
 
 	for _, item := range items {
-		smallerCombos := genComb(items, size-1)
+		smallerCombos := genComb(items, size-1, s)
 		for _, combo := range smallerCombos {
 			ans = append(ans, append([]Operator{item}, combo...))
 		}
 	}
 
-	// fmt.Println("Generated combos", ans)
-
 	return ans
 }
 
 func operate(oper1 int, op Operator, oper2 int) int {
-	// fmt.Printf("%d %s %d", oper1, op, oper2)
 	switch op {
 	case MUL:
 		return oper1 * oper2
 	case ADD:
 		return oper1 + oper2
+	case CONCAT:
+		c := fmt.Sprintf("%d%d", oper1, oper2)
+		i, _ := strconv.Atoi(c)
+		return i
 	default:
 		fmt.Println("Impossible operation")
 		return 0
@@ -111,12 +107,30 @@ func (s *Statement) checkCalcAnswerMatch(ops []Operator) bool {
 
 		// short circuit if we already are over our
 		if total > s.answer {
-			// fmt.Println("already over answer, short circuit", total)
 			continue
 		}
 
 	}
 	return total == s.answer
+}
+
+func (i *Input) RunPart2() int {
+	// opCombos := genComb(OPS, len(i.statements)-1)
+	total := 0
+
+OUTER:
+	for _, statement := range i.statements {
+		combos := genComb(OPS_P2, len(statement.operands)-1, statement)
+		for _, combo := range combos {
+			if ok := statement.checkCalcAnswerMatch(combo); ok {
+				total += statement.answer
+				continue OUTER
+			}
+		}
+
+	}
+
+	return total
 }
 
 func (i *Input) RunPart1() int {
@@ -127,8 +141,7 @@ OUTER:
 	for _, statement := range i.statements {
 		// get all the combos and check each one, short circuit if we find an answer
 
-		// fmt.Println("Generating combos for statement", statement)
-		combos := genComb(OPS, len(statement.operands)-1)
+		combos := genComb(OPS_P1, len(statement.operands)-1, statement)
 
 		for _, combo := range combos {
 			if ok := statement.checkCalcAnswerMatch(combo); ok {
@@ -142,7 +155,10 @@ OUTER:
 	return total
 }
 
-var OPS []Operator = []Operator{MUL, ADD}
+var (
+	OPS_P2 []Operator = []Operator{MUL, ADD, CONCAT}
+	OPS_P1 []Operator = []Operator{MUL, ADD}
+)
 
 func main() {
 	f, _ := os.Open("aoc-day7-input.txt")
@@ -150,4 +166,6 @@ func main() {
 
 	p1 := i.RunPart1()
 	fmt.Printf("Day 7 Part 1 ans=%d\n", p1)
+	p2 := i.RunPart2()
+	fmt.Printf("Day 7 Part 2 ans=%d\n", p2)
 }
