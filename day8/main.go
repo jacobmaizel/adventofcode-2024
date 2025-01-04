@@ -124,6 +124,62 @@ func (i *input) computePart1() {
 	}
 }
 
+// keep computing antinode positions until its out of bounds
+// for both directions
+func (i *input) computePart2() {
+	for _, p := range i.antennaPairs {
+		// fmt.Printf("Starting AP bounds for pair=%s\n", p.String())
+		dist1Row, dist1Col := distance(p.start.pos, p.end.pos)
+
+		// fmt.Printf("dist1Row=%d, dist1Col=%d\n", dist1Row, dist1Col)
+
+		// fmt.Printf("api1 = %d+%d*2, %d+%d*2\n", p.start.pos.row, dist1Row, p.start.pos.col, dist1Col)
+		i.antinodePositions[p.start.pos] = true
+		i.antinodePositions[p.end.pos] = true
+		nextPosRow := p.start.pos.row + dist1Row*2
+		nextPosCol := p.start.pos.col + dist1Col*2
+		ap1 := newPos(nextPosRow, nextPosCol)
+		// fmt.Printf("ap1: %s\n", ap1.String())
+
+		for i.inBounds(&ap1) {
+			// fmt.Println("ap1 was inbounds")
+			i.antinodePositions[ap1] = true
+
+			nextPosRow += dist1Row
+			nextPosCol += dist1Col
+
+			ap1 = newPos(nextPosRow, nextPosCol)
+			// fmt.Println("setting ap1 to new pos=", ap1)
+		}
+
+		// if i.inBounds(&ap1) {
+		// 	// fmt.Println("ap1 was in bounds!")
+		// }
+
+		dist2Row, dist2Col := distance(p.end.pos, p.start.pos)
+		nextPosRow = p.end.pos.row + dist2Row*2
+		nextPosCol = p.end.pos.col + dist2Col*2
+
+		ap2 := newPos(nextPosRow, nextPosCol)
+		// fmt.Printf("ap2: %s\n", ap2.String())
+
+		for i.inBounds(&ap2) {
+			// fmt.Println("ap2 was inbounds")
+			i.antinodePositions[ap2] = true
+
+			nextPosRow += dist2Row
+			nextPosCol += dist2Col
+
+			ap2 = newPos(nextPosRow, nextPosCol)
+			// fmt.Println("setting ap2 to new pos=", ap2)
+		}
+		// if i.inBounds(&ap2) {
+		// 	// fmt.Println("ap2 was in bounds!")
+		// 	i.antinodePositions[ap2] = true
+		// }
+	}
+}
+
 // as part of the initial reading, we can build the combos
 // as well as their reversals at the same time
 func newInput(r io.Reader) *input {
@@ -189,7 +245,9 @@ func main() {
 	f, _ := os.Open("aoc-day8-input.txt")
 	defer f.Close()
 	i := newInput(f)
-	i.computePart1()
-	fmt.Printf("Day 8 Part 1 ans=%d\n", len(i.antinodePositions))
+	// i.computePart1()
+	// fmt.Printf("Day 8 Part 1 ans=%d\n", len(i.antinodePositions))
+	i.computePart2()
+	fmt.Printf("Day 8 Part 2 ans=%d\n", len(i.antinodePositions))
 	// fmt.Println(i.String())
 }
