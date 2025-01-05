@@ -16,12 +16,30 @@ func Test_checksum(t *testing.T) {
 		expect int
 	}{
 		// TODO: Add test cases.
-		{name: "example", input: "2333133121414131402", expect: 1928},
+		{name: "example", input: "2333133121414131402", expect: 2858},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			i := newInput(strings.NewReader(tt.input))
 			// fmt.Println(string(i.diskMap))
+			i.expandDiskMap()
+			var res strings.Builder
+
+			for _, b := range i.expandedMap {
+				res.WriteString(b.String())
+			}
+
+			// fmt.Println(res.String())
+
+			i.compressDiskMap()
+
+			var re2 strings.Builder
+
+			for _, b := range i.expandedMap {
+				re2.WriteString(b.String())
+			}
+
+			// fmt.Println(re2.String())
 
 			e := i.checkSum()
 
@@ -46,11 +64,11 @@ func Test_expand_blocks(t *testing.T) {
 			i := newInput(strings.NewReader(tt.input))
 			// fmt.Println(string(i.diskMap))
 
-			e := i.expandDiskMap()
+			i.expandDiskMap()
 
 			var res strings.Builder
 
-			for _, b := range e {
+			for _, b := range i.expandedMap {
 				res.WriteString(b.String())
 			}
 
@@ -62,25 +80,27 @@ func Test_expand_blocks(t *testing.T) {
 	}
 }
 
-func Test_compress_file(t *testing.T) {
+// different compression rules for part 2
+func Test_compress_filePart2(t *testing.T) {
 	tests := []struct {
 		name   string // description of this test case
 		input  string
 		expect string
 	}{
 		// TODO: Add test cases.
-		{name: "example", input: "2333133121414131402", expect: "0099811188827773336446555566.............."},
+		{name: "example", input: "2333133121414131402", expect: "00992111777.44.333....5555.6666.....8888.."},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			i := newInput(strings.NewReader(tt.input))
 			// fmt.Println(string(i.diskMap))
 
-			e := i.compressDiskMap()
+			i.expandDiskMap()
+			i.compressDiskMap()
 
 			var res strings.Builder
 
-			for _, b := range e {
+			for _, b := range i.expandedMap {
 				res.WriteString(b.String())
 			}
 			r := res.String()
@@ -91,11 +111,39 @@ func Test_compress_file(t *testing.T) {
 	}
 }
 
+// func Test_compress_file(t *testing.T) {
+// 	tests := []struct {
+// 		name   string // description of this test case
+// 		input  string
+// 		expect string
+// 	}{
+// 		// TODO: Add test cases.
+// 		{name: "example", input: "2333133121414131402", expect: "0099811188827773336446555566.............."},
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			i := newInput(strings.NewReader(tt.input))
+// 			// fmt.Println(string(i.diskMap))
+
+// 			e := i.compressDiskMap()
+
+// 			var res strings.Builder
+
+// 			for _, b := range e {
+// 				res.WriteString(b.String())
+// 			}
+// 			r := res.String()
+// 			if tt.expect != r {
+// 				t.Fatalf("\ncompressFile = %s\nwant=          %s\n", r, tt.expect)
+// 			}
+// 		})
+// 	}
+// }
+
 /*
-initial version
-1098           1090546 ns/op         1380422 B/op       49339 allocs/op
-not using writestring for filemode writing
-4346            274089 ns/op          383812 B/op          25 allocs/op
+initial correct answer
+355           3116640 ns/op         9083822 B/op       10030 allocs/op
+932           1323666 ns/op         2263125 B/op       38810 allocs/op
 */
 func Benchmark_expand_disk_map(b *testing.B) {
 	f, _ := os.Open("aoc-day9-input.txt")
@@ -106,17 +154,5 @@ func Benchmark_expand_disk_map(b *testing.B) {
 
 	for idx := 0; idx < b.N; idx++ {
 		i.expandDiskMap()
-	}
-}
-
-func Benchmark_compress(b *testing.B) {
-	f, _ := os.Open("aoc-day9-input.txt")
-
-	defer f.Close()
-
-	i := newInput(f)
-
-	for idx := 0; idx < b.N; idx++ {
-		i.compressDiskMap()
 	}
 }
