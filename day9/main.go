@@ -13,210 +13,144 @@ Day 9
 */
 
 type input struct {
-	diskMap     []byte
-	expandedMap []block
+	input      []byte
+	fileSystem []int
 }
 
 func newInput(r io.Reader) *input {
 	v, _ := io.ReadAll(r)
-	return &input{diskMap: v}
+	return &input{input: v}
 }
-
-type file struct {
-	// val byte // the value at that index from the original disk map
-	id         int    // the original index that this came from in the input disk map'
-	expanded   string // the complete file contents after expansion
-	len        int    // length of expanded
-	compressed bool   // has this file already been compressed?
-}
-
-type emptySpace struct {
-	span int // how many contiguous spaces there is in this span
-}
-
-func newEmptySpace(span int) *emptySpace {
-	return &emptySpace{span}
-}
-
-type block interface {
-	block()
-	String() string
-}
-
-func (f file) block()       {}
-func (f emptySpace) block() {}
 
 const (
 	FILE_MODE = iota
 	FREE_SPACE_MODE
 )
 
-func (e emptySpace) String() string {
-	return strings.Repeat(".", e.span)
+func (i *input) String() string {
+	var s strings.Builder
+
+	for _, v := range i.fileSystem {
+		if v == -1 {
+			s.WriteString(".")
+		} else {
+			con := strconv.Itoa(v)
+			s.WriteString(con)
+		}
+	}
+
+	return s.String()
 }
 
-func (f file) String() string {
-	return f.expanded
-}
+func (i *input) buildFileSystem() {
+	fileIdCounter := 0
 
-var EMPTY_SPACE_BLOCK = emptySpace{}
+	var fs []int
 
-func (i *input) expandDiskMap() {
-	currFileId := 0
-
-	var buff []block
-
-	for diskIdx := range i.diskMap {
-		diskmapVal := i.diskMap[diskIdx] // how many loops we need to do to expand
-
+	for diskIdx := range i.input {
+		diskmapVal := i.input[diskIdx] // how many loops we need to do to expand
+		loops := int(diskmapVal - '0')
 		switch diskIdx % 2 {
 		case FILE_MODE:
-			loops, _ := strconv.Atoi(string(diskmapVal))
-			completeFileRaw := strconv.Itoa(currFileId)
-			completeFileStr := strings.Repeat(completeFileRaw, loops)
-
-			f := newFile(currFileId, completeFileStr)
-			buff = append(buff, f)
-			currFileId++
-
+			for range loops {
+				fs = append(fs, fileIdCounter)
+			}
+			fileIdCounter++
 		case FREE_SPACE_MODE:
-			// if the previous block is also an empty file,
-			loops, _ := strconv.Atoi(string(diskmapVal))
-			// current free space block.
-			// TODO: check previous value, if its also a free space,
-			// we need to combine the lengths.
-			currEmptySpanLen := loops
-			if es, prevIsEmptySpace := buff[len(buff)-1].(*emptySpace); prevIsEmptySpace {
-				// our previous value is an empty space block, so we should combine them
 
-				// NOTE: is this actually modifying anything?
-				es.span += currEmptySpanLen
-			} else {
-				// previous was a file, so create a fresh empty space block.
-				ns := newEmptySpace(currEmptySpanLen)
-				buff = append(buff, ns)
+			for range loops {
+				fs = append(fs, -1)
 			}
 		}
 	}
 
-	i.expandedMap = buff
+	i.fileSystem = fs
 }
 
-func newFile(id int, expanded string) *file {
-	l := len(expanded)
-	return &file{id: id, expanded: expanded, len: l}
+func (in *input) compressFileSystem() {
+	end := len(in.fileSystem) - 1
+
+	for end >= 0 {
+		// start := 0
+		// get next file
+		for end >= 0 && in.fileSystem[end] == -1 {
+			end--
+		}
+		if end < 0 {
+			break
+		}
+		fileId := in.fileSystem[end]
+		fileSize := in.getFileSize(fileId, end)
+		nextSpaceStartIdx, spaceFound := in.nextSpaceIdx(fileSize, end-fileSize+1)
+
+		if spaceFound {
+			in.swapBlocks(fileSize, nextSpaceStartIdx, end)
+		}
+
+		end -= fileSize
+
+	}
 }
 
-func insertAtIdx[T any](li []T, idx int, val T) []T {
-	return append(li[:idx], append([]T{val}, li[idx:]...)...)
-}
-
-func removeAtIndex[T any](s []T, index int) []T {
-	return append(s[:index], s[index+1:]...)
-}
-
-func swap(l []block, i1, i2 int) []block {
+func swap(l []int, i1, i2 int) []int {
 	l[i1], l[i2] = l[i2], l[i1]
 	return l
 }
 
-func (in *input) nextFileIdx(endIdx int) (int, error) {
-	for endIdx > 0 {
-		// fmt.Printf("nextFileIdx checking at %d\n", endIdx)
-		if v, ok := in.expandedMap[endIdx].(*file); ok && !v.compressed {
-			// fmt.Printf("Found a file at %d\n", endIdx)
-			return endIdx, nil
-		}
-		endIdx--
+func (in *input) getFileSize(fileId int, startIdx int) int {
+	ctr := 0
+	for startIdx >= 0 && in.fileSystem[startIdx] == fileId {
+		startIdx--
+		ctr++
 	}
-
-	return -1, fmt.Errorf("file was already compressed! we are done")
+	return ctr
 }
 
-func (in *input) nextSpaceIdx(endIdx int, minSize int) (int, error) {
+// starting always from 0, look for a block of spaces of adequate size for given file
+func (in *input) nextSpaceIdx(size, end int) (int, bool) {
 	start := 0
-	for start <= endIdx {
-		if v, ok := in.expandedMap[start].(*emptySpace); ok && v.span >= minSize {
-			return start, nil
+
+	for start < end {
+		i := 0
+		found := true
+		for i < size {
+			if in.fileSystem[start+i] != -1 {
+				found = false
+				break
+			}
+			i++
 		}
+		if found {
+			return start, true
+		}
+		start += i
+		for start < len(in.fileSystem) && in.fileSystem[start] != -1 {
+			start++
+		}
+	}
+
+	return start, false
+}
+
+func (in *input) swapBlocks(size int, start, end int) {
+	for range size {
+		in.fileSystem = swap(in.fileSystem, start, end)
 		start++
-	}
-
-	return -1, fmt.Errorf("no space block found that fits that size")
-}
-
-func (i *input) compressDiskMap() {
-	// fmt.Println("starting compressdiskmap")
-
-	start := 0
-	end := len(i.diskMap) - 1
-
-	for start <= end {
-		// fmt.Printf("at top of compress loop, start=%d, end=%d\n", start, end)
-
-		fIdx, err := i.nextFileIdx(end)
-		if err != nil {
-			// fmt.Println("no uncompressed file found! exiting")
-			return
-		}
-		currFile := i.expandedMap[fIdx].(*file)
-
-		// fmt.Println("Got a file, about to look for space")
-
-		// find a space that could fit that file
-		spaceIdx, err := i.nextSpaceIdx(end, currFile.len)
-		if err != nil {
-			// fmt.Println("no valid space available that fits file w/ len", currFile.len, currFile.expanded)
-			end = fIdx - 1
-			start = 0
-			continue
-		}
-		currSpace := i.expandedMap[spaceIdx].(*emptySpace)
-		// fmt.Println("Got a space, about to look check for space left over")
-
-		// do we have any left over space?
-		spaceLeftOverAfterMove := currSpace.span - currFile.len
-
-		// if we have space left over, we need to adjust the current space to the size of the file
-		// and create a new space after our file that has the remainder.
-
-		if spaceLeftOverAfterMove > 0 {
-			currSpace.span = currFile.len
-			remainderSpace := newEmptySpace(spaceLeftOverAfterMove)
-			i.expandedMap = swap(i.expandedMap, spaceIdx, fIdx)
-			i.expandedMap = insertAtIdx(i.expandedMap, spaceIdx+1, block(remainderSpace))
-		} else {
-			swap(i.expandedMap, spaceIdx, fIdx)
-		}
-
-		end = fIdx - 1
-		start = 0
+		end--
 	}
 }
 
-func (i *input) checkSum() int {
+func (in *input) checkSum() int {
 	ans := 0
+	in.buildFileSystem()
 
-	var completeDisk strings.Builder
+	in.compressFileSystem()
 
-	for _, val := range i.expandedMap {
-		completeDisk.WriteString(val.String())
-	}
-
-	comp := completeDisk.String()
-	// fmt.Println(comp)
-
-	// fmt.Println(comp)
-
-	for idx, s := range comp {
-
-		st, err := strconv.Atoi(string(s))
-		if err != nil {
+	for idx, val := range in.fileSystem {
+		if val == -1 {
 			continue
 		}
-
-		ans += idx * st
-
+		ans += idx * val
 	}
 
 	return ans
@@ -224,22 +158,11 @@ func (i *input) checkSum() int {
 
 func main() {
 	f, _ := os.Open("aoc-day9-input.txt")
-	defer f.Close()
-
-	// s := []int{1, 2, 3}
-
-	// s = insertAtIdx(s, 1, 5)
-	// s = insertAtIdx(s, 2, 10)
-
-	// fmt.Println(s)
 
 	i := newInput(f)
 
-	i.expandDiskMap()
-	i.compressDiskMap()
-	// fmt.Println(i.expandedMap)
+	i.buildFileSystem()
 
+	i.compressFileSystem()
 	fmt.Println(i.checkSum())
-
-	fmt.Println(len(i.diskMap))
 }
