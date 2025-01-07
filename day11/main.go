@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -12,7 +13,8 @@ import (
 var _ = os.Open
 
 type input struct {
-	stones []string
+	stones []int
+	cache  map[stone]int
 }
 
 func newInput(r io.Reader) *input {
@@ -21,66 +23,72 @@ func newInput(r io.Reader) *input {
 
 	line := strings.TrimSpace(s.Text())
 
-	return &input{strings.Split(line, " ")}
+	strItems := strings.Split(line, " ")
+
+	st := []int{}
+
+	for i := range strItems {
+		v, _ := strconv.Atoi(strItems[i])
+		st = append(st, v)
+	}
+
+	return &input{stones: st, cache: make(map[stone]int)}
 }
 
-// func insert(l []string, val string, idx int) []string {
-// 	return append(l[:idx], append([]string{val}, l[idx:]...)...)
-// }
+func splitNum(num int) (int, int) {
+	dig := len(fmt.Sprintf("%d", num))
+	halfDig := dig / 2
 
-// has to be if else because order of rules matter, first applicable must run
+	div := int(math.Pow10(halfDig))
+	left := num / div
+	right := num % div
 
-func (in *input) processStone(stone string) []string {
-	ans := []string{}
+	return left, right
+}
 
-	if stone == "0" {
-		ans = append(ans, "1")
-	} else if len(stone)%2 == 0 {
+type stone struct {
+	blink int
+	value int
+}
+
+func newStone(blink int, value int) stone {
+	return stone{blink, value}
+}
+
+func (in *input) processStone(stone int, blink int) int {
+	val := 0
+	ns := newStone(blink, stone)
+	if blink == 0 {
+		return 1
+	} else if v, ok := in.cache[ns]; ok {
+		return v
+	} else if stone == 0 {
+		val = in.processStone(1, blink-1)
+	} else if len(fmt.Sprintf("%d", stone))%2 == 0 {
 		// even len numbers split in half, remove leading 0s from right half
-		// fmt.Println("splitting stone=", stone)
-		rightHalf := stone[len(stone)/2:]
-		// fmt.Println("righthalf", rightHalf)
-		if len(rightHalf) > 1 {
-			ptr := 0
-			for rightHalf[ptr] == '0' && ptr < len(rightHalf)-1 {
-				ptr++
-			}
-			rightHalf = rightHalf[ptr:]
-		}
-		// fmt.Println("after trim 0s", rightHalf)
-		ans = append(ans, stone[:len(stone)/2])
-		ans = append(ans, rightHalf)
-
+		left, right := splitNum(stone)
+		val = in.processStone(left, blink-1) + in.processStone(right, blink-1)
 	} else {
-		// mult stone val by 2024
-		nVal, _ := strconv.Atoi(stone)
-		ans = append(ans, strconv.Itoa(nVal*2024))
+		val = in.processStone(stone*2024, blink-1)
 	}
-	// fmt.Println("after adjustment", ans)
 
-	return ans
+	in.cache[ns] = val
+	return val
 }
 
-func (in *input) blink() {
-	n := []string{}
-
-	for _, stone := range in.stones {
-		v := in.processStone(stone)
-		n = append(n, v...)
+func (i *input) simulateBlinks(blinks int) int {
+	total := 0
+	for _, stone := range i.stones {
+		total += i.processStone(stone, blinks)
 	}
 
-	in.stones = n
-}
-
-func (i *input) simulateBlinks(blinks int) {
-	for range blinks {
-		i.blink()
-	}
+	return total
 }
 
 func main() {
 	f, _ := os.Open("input.txt")
+	defer f.Close()
 	i := newInput(f)
-	i.simulateBlinks(20)
-	fmt.Println("day11p1->", len(i.stones))
+	res := i.simulateBlinks(75)
+	fmt.Println("day11p2->", res)
 }
