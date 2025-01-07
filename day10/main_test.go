@@ -6,6 +6,52 @@ import (
 	"testing"
 )
 
+func Test_rating_calc(t *testing.T) {
+	tests := []struct {
+		name           string // description of this test case
+		input          string
+		expectedRating int
+	}{
+		{
+			name: "example",
+			input: `..90..9
+...1.98
+...2..7
+6543456
+765.987
+876....
+987....`,
+			expectedRating: 13,
+		},
+		{
+			name: "example Test2 small",
+			input: `.....0.
+              ..4321.
+              ..5..2.
+              ..6543.
+              ..7..4.
+              ..8765.
+              ..9....`,
+			expectedRating: 3,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := strings.NewReader(tt.input)
+
+			in := newInput(r)
+
+			// fmt.Println(in.String())
+			// fmt.Println(in.trailheadPositions)
+			res := in.calcRating()
+
+			if res != tt.expectedRating {
+				t.Errorf("got %d, want %d", res, tt.expectedRating)
+			}
+		})
+	}
+}
+
 func Test_main(t *testing.T) {
 	tests := []struct {
 		name                         string // description of this test case
@@ -65,8 +111,20 @@ func Test_main(t *testing.T) {
 	}
 }
 
+func Benchmark_part2(b *testing.B) {
+	f, _ := os.Open("input-day10.txt")
+	defer f.Close()
+
+	in := newInput(f)
+
+	for i := 0; i < b.N; i++ {
+		in.calcRating()
+	}
+}
+
 func Benchmark_part1(b *testing.B) {
 	f, _ := os.Open("input-day10.txt")
+	defer f.Close()
 
 	in := newInput(f)
 

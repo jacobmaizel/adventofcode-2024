@@ -30,6 +30,8 @@ step? explore that. etc.
 only start searches from there
 
 // approach 3: recursive traversal at each valid next step
+
+// approach 4: can we do some fancy Dynamic programming?
 */
 
 type position struct {
@@ -55,9 +57,13 @@ func newInput(r io.Reader) *input {
 		row := strings.TrimSpace(s.Text())
 		r := make([]int, len(row))
 		for i := range len(row) {
-			r[i] = int(row[i] - '0')
-			if r[i] == 0 {
-				in.trailheadPositions = append(in.trailheadPositions, newPos(len(in.grid), i))
+			if row[i] == '.' {
+				r[i] = -1 // Use -1 to represent a period (or another unique value not in your number range)
+			} else {
+				r[i] = int(row[i] - '0') // Convert character digit to integer
+				if r[i] == 0 {
+					in.trailheadPositions = append(in.trailheadPositions, newPos(len(in.grid), i))
+				}
 			}
 		}
 
@@ -74,10 +80,12 @@ func (in *input) String() string {
 	var s strings.Builder
 	for r := range in.rows {
 		for c := range in.cols {
-			// fmt.Println(in.grid[r][c])
-			v := strconv.Itoa(in.grid[r][c])
-			// fmt.Println(v)
-			s.WriteString(v)
+			v := in.grid[r][c]
+			if v == -1 {
+				s.WriteByte('.')
+			} else {
+				s.WriteString(strconv.Itoa(v))
+			}
 		}
 		s.WriteString("\n")
 	}
@@ -115,19 +123,32 @@ func (in *input) nextSteps(currRow, currCol int) [][2]int {
 	return ans
 }
 
-func (in *input) traverseTrail(currRow, currCol int, reached map[position]bool) int {
+func (in *input) traverseTrail(currRow, currCol int, reached map[position]int) {
 	currP := newPos(currRow, currCol)
 
 	if in.getGridVal(currRow, currCol) == 9 {
-		reached[currP] = true
-		return 1
+		reached[currP]++
+		return
 	}
-
-	total := 0
 
 	ns := in.nextSteps(currRow, currCol)
 	for _, dir := range ns {
-		total += in.traverseTrail(currRow+dir[0], currCol+dir[1], reached)
+		in.traverseTrail(currRow+dir[0], currCol+dir[1], reached)
+	}
+}
+
+// how many distinct paths are there from each trailhead to a 9-height position?
+func (in *input) calcRating() int {
+	total := 0
+
+	for _, starts := range in.trailheadPositions {
+		reached := make(map[position]int)
+
+		in.traverseTrail(starts.row, starts.col, reached)
+
+		for _, k := range reached {
+			total += k
+		}
 	}
 
 	return total
@@ -137,7 +158,7 @@ func (in *input) calcScore() int {
 	total := 0
 
 	for _, starts := range in.trailheadPositions {
-		reached := make(map[position]bool)
+		reached := make(map[position]int)
 
 		in.traverseTrail(starts.row, starts.col, reached)
 
@@ -151,8 +172,7 @@ func main() {
 	f, _ := os.Open("input-day10.txt")
 
 	in := newInput(f)
-	// fmt.Println(in.String())
-	// fmt.Println(in.trailheadPositions)
 
 	fmt.Println("D10P1->\n", in.calcScore())
+	fmt.Println("D10P2->\n", in.calcRating())
 }
